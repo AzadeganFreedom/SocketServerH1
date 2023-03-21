@@ -18,30 +18,35 @@ namespace SocketServerH1
                 ProtocolType.Tcp);
             listener.Bind(endpoint);
 
-            while(true)StartServer(listener);
+            listener.Listen(10);
+            Console.WriteLine($"Server listening on: {listener.LocalEndPoint}");
+
+            while (true)StartServer(listener);
         }
 
         private void StartServer(Socket listener)
         {
-            
-            listener.Listen(10);
-            Console.WriteLine($"Server listening on: {listener.LocalEndPoint}");
             Socket handler = listener.Accept();
             Console.WriteLine($"Accepting connection from { handler.RemoteEndPoint}");
 
             string msg = null;
             byte[] buffer = new byte[1024];
 
-            while (true)
+            while (msg == null || !msg.Contains("<EOM>"))
             {
-                int bytesRec = handler.Receive(buffer);
-                msg += Encoding.ASCII.GetString(buffer, 0, bytesRec);
-                if (msg.IndexOf("<EOM>") > -1) break;
+                int received = handler.Receive(buffer);
+                msg += Encoding.ASCII.GetString(buffer, 0, received);
             }
             Console.WriteLine($"Message: {msg}");
+
+            string msgRecieved = "Message Recieved";
+            byte[] bytes = Encoding.ASCII.GetBytes(msgRecieved);
+            handler.Send(bytes);
+            handler.Shutdown(SocketShutdown.Both);
+            handler.Close();
         }
 
-        public IPEndPoint GetServerEndPoint()
+        private IPEndPoint GetServerEndPoint()
         {
             string strHostName = Dns.GetHostName();
             IPHostEntry host = Dns.GetHostEntry(strHostName);
@@ -55,6 +60,9 @@ namespace SocketServerH1
                     addrList.Add(item);
                 }
             }
+
+            if(addrList.Count == 1) return new IPEndPoint(addrList[0], 11000);
+
             int temp = 0;
             do { Console.WriteLine("Select server IP"); }
             while (!int.TryParse(Console.ReadLine(), out temp) || temp > addrList.Count || temp <0);
